@@ -73,6 +73,23 @@
 ```
 
 2. Запустите masscsr
+3. В папке `test_certs/{container.name}` сохраняется результат csr запроса: `{container.name}.(pfx;cer;csr)`
+4. В файле `test_certs/info.json` находится информация о сгенерированных ЭЦП
+```json
+[
+	{
+		"name": "Test_IvanIvanov",
+		"thumbprint": "f59668374c3e8f2d444402452aa113c9d78bbbbb",
+		"containerName": "\\\\.\\REGISTRY\\Test_IvanIvanov",
+		"containerPin": "1"
+	},
+	{
+		"name": "Test_Petrov",
+		"thumbprint": "1e1d7ee1e81774a8a06b0bd5aa0c80bffd451111",
+		"containerName": "\\\\.\\REGISTRY\\Test_Petrov"
+	}
+]
+```
 
 ### Аргументы запуска
 
