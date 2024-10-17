@@ -41,7 +41,7 @@ func requestRootCertificate() string {
 	return certData
 }
 
-func getRootCertificateThumbprint(data string) (string, error) {
+func getThumbprintFromBS64Certificate(data string) (string, error) {
 	rootCertificateDer := strings.ReplaceAll(data, "-----BEGIN CERTIFICATE-----\r\n", "")
 	rootCertificateDer = strings.ReplaceAll(rootCertificateDer, "-----END CERTIFICATE-----\r\n", "")
 

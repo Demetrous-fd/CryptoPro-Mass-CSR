@@ -360,9 +360,6 @@ func requestCertificate(csr string) string {
 	}
 
 	certData := string(cert)
-
-	certData = strings.ReplaceAll(certData, "-----BEGIN CERTIFICATE-----\r\n", "")
-	certData = strings.ReplaceAll(certData, "-----END CERTIFICATE-----\r\n", "")
 	return certData
 }
 
@@ -376,6 +373,9 @@ func installCertificate(x509 *cades.X509EnrollmentRoot, certificateData string) 
 	if err != nil {
 		return err
 	}
+
+	certificateData = strings.ReplaceAll(certificateData, "-----BEGIN CERTIFICATE-----\r\n", "")
+	certificateData = strings.ReplaceAll(certificateData, "-----END CERTIFICATE-----\r\n", "")
 
 	err = enrollCert.InstallResponse(ALLOW_UNTRUSTED_ROOT, certificateData, XCN_CRYPT_STRING_BASE64, "")
 	if err != nil {

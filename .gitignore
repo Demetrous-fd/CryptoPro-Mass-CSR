@@ -3,3 +3,4 @@ bin/
 README.pdf
 csr.json
 logger.log
+test_certs/

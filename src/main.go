@@ -7,23 +7,29 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	cades "github.com/Demetrous-fd/CryptoPro-Adapter"
 	"golang.org/x/exp/slog"
 )
 
 var (
-	debugFlag    *bool
-	skipRootFlag *bool
-	versionFlag  *bool
-	csrFileFlag  *string
+	debugFlag        *bool
+	flatFlag         *bool
+	skipRootFlag     *bool
+	versionFlag      *bool
+	csrFileFlag      *string
+	outputFolderFlag *string
 )
 
 func init() {
 	debugFlag = flag.Bool("debug", false, "Включить отладочную информацию")
-	skipRootFlag = flag.Bool("skip-root", false, "Пропустить установку корневого сертификата тестового УЦ")
-	csrFileFlag = flag.String("file", "csr.json", "JSON файл с csr запросами")
 	versionFlag = flag.Bool("version", false, "Отобразить версию программы")
+	skipRootFlag = flag.Bool("skip-root", false, "Пропустить установку корневого сертификата тестового УЦ")
+	flatFlag = flag.Bool("flat", false, "Не сохранять контейнер/сертификат/csr запрос в отдельной папке")
+
+	csrFileFlag = flag.String("file", "csr.json", "JSON файл с csr запросами")
+	outputFolderFlag = flag.String("folder", "test_certs", "Директория сохранения контейнеров/сертификатов/csr запросов")
 }
 
 type CSRsBlock struct {
@@ -35,7 +41,7 @@ func main() {
 	flag.Parse()
 
 	if *versionFlag {
-		fmt.Println("Masscsr version 0.0.0")
+		fmt.Println("Masscsr version 0.1.0")
 		fmt.Println("Repository: https://github.com/Demetrous-fd/CryptoPro-Mass-CSR")
 		fmt.Println("Maintainer: Lazydeus (Demetrous-fd)")
 		return
@@ -61,6 +67,10 @@ func main() {
 	var handler slog.Handler = slog.NewTextHandler(w, loggerOptions)
 	logger := slog.New(handler)
 	slog.SetDefault(logger)
+
+	if _, err := os.Stat(*outputFolderFlag); errors.Is(err, os.ErrNotExist) {
+		os.Mkdir(*outputFolderFlag, os.ModePerm)
+	}
 
 	if _, err := os.Stat(*csrFileFlag); errors.Is(err, os.ErrNotExist) {
 		slog.Error(fmt.Sprintf("File: '%s' not exists", *csrFileFlag))
@@ -100,7 +110,25 @@ func main() {
 
 	x509 := cades.CreateX509EnrollmentRoot(cadesLocal)
 
+	var containersInfo []ContainerInfo
 	for _, csr := range csrsBlock.Requests {
-		ExecuteCsrInstall(x509, &csr)
+		info := ExecuteCsrInstall(x509, &csr)
+
+		if (info != &ContainerInfo{}) {
+			containersInfo = append(containersInfo, *info)
+		}
+	}
+
+	infoData, err := json.MarshalIndent(containersInfo, "", "\t")
+	if err == nil {
+		infoPath := filepath.Join(*outputFolderFlag, "info.json")
+		infoFile, err := os.Create(infoPath)
+		if err != nil {
+			slog.Error(err.Error())
+			return
+		}
+		defer infoFile.Close()
+
+		infoFile.Write(infoData)
 	}
 }
