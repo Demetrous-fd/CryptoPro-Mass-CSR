@@ -15,6 +15,7 @@ type ContainerInfo struct {
 	Thumbprint    string `json:"thumbprint"`
 	ContainerName string `json:"containerName"`
 	ContainerPin  string `json:"containerPin,omitempty"`
+	Exportable    bool   `json:"exportable"`
 }
 
 func ExecuteCsrInstall(x509 *cades.X509EnrollmentRoot, csr *CsrParams) *ContainerInfo {
@@ -91,6 +92,7 @@ func ExecuteCsrInstall(x509 *cades.X509EnrollmentRoot, csr *CsrParams) *Containe
 	result.Thumbprint = certThumbprint
 	result.ContainerName = container.ContainerName
 	result.ContainerPin = csr.Container.Pin
+	result.Exportable = csr.Container.Exportable
 	return result
 }
 
