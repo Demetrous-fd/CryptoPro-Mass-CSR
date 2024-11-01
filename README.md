@@ -74,7 +74,7 @@
         "skipRoot": true,
         "skipStore": true,
         "outputFolder": "test_certs"
-    }  // Аргументы запуска masscsr
+    }  // Аргументы запуска masscsr, необязательный параметр
 }
 ```
 
