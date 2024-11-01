@@ -13,12 +13,13 @@ import (
 type ContainerInfo struct {
 	Name          string `json:"name"`
 	Thumbprint    string `json:"thumbprint"`
-	ContainerName string `json:"containerName"`
+	ContainerName string `json:"containerName,omitempty"`
 	ContainerPin  string `json:"containerPin,omitempty"`
 	Exportable    bool   `json:"exportable"`
 }
 
-func ExecuteCsrInstall(x509 *cades.X509EnrollmentRoot, csr *CsrParams) *ContainerInfo {
+func ExecuteCsrInstall(x509 *cades.X509EnrollmentRoot, csr *CsrParams, params *Params) *ContainerInfo {
+	cm := cades.CadesManager{}
 	result := &ContainerInfo{}
 	csrData, err := generateCsr(x509, csr)
 	if err != nil {
@@ -26,8 +27,14 @@ func ExecuteCsrInstall(x509 *cades.X509EnrollmentRoot, csr *CsrParams) *Containe
 		return result
 	}
 
-	outputFolder := *outputFolderFlag
-	if !*flatFlag {
+	var outputFolder string
+	if params.OutputFolder == "" {
+		outputFolder = *outputFolderFlag
+	} else {
+		outputFolder = params.OutputFolder
+	}
+
+	if !*params.Flat {
 		outputFolder = filepath.Join(outputFolder, csr.Container.Name)
 
 		if _, err := os.Stat(outputFolder); errors.Is(err, os.ErrNotExist) {
@@ -43,9 +50,19 @@ func ExecuteCsrInstall(x509 *cades.X509EnrollmentRoot, csr *CsrParams) *Containe
 	}
 	csrFile.WriteString(csrData)
 
+	container, err := cm.GetContainer(csr.Container.Name)
+	if err != nil {
+		slog.Error(fmt.Sprintf("Cant get container with name: %s, error: %s", csr.Container.Name, err.Error()))
+	}
+
+	if *params.SkipStore {
+		defer cm.DeleteContainer(container)
+	}
+
 	certificate := requestCertificate(csrData)
 	if certificate == "" {
 		slog.Error(fmt.Sprintf("Cant request certificate, container[%s]", csr.Container.Name))
+		cm.DeleteContainer(container)
 		return result
 	}
 
@@ -60,13 +77,8 @@ func ExecuteCsrInstall(x509 *cades.X509EnrollmentRoot, csr *CsrParams) *Containe
 	err = installCertificate(x509, certificate)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Cant install certificate, container[%s], error: %s", csr.Container.Name, err.Error()))
+		cm.DeleteContainer(container)
 		return result
-	}
-
-	cm := cades.CadesManager{}
-	container, err := cm.GetContainer(csr.Container.Name)
-	if err != nil {
-		slog.Error(fmt.Sprintf("Cant get container with name: %s, error: %s", csr.Container.Name, err.Error()))
 	}
 
 	if csr.Container.Exportable {
@@ -89,17 +101,37 @@ func ExecuteCsrInstall(x509 *cades.X509EnrollmentRoot, csr *CsrParams) *Containe
 	if err != nil {
 		slog.Error(err.Error())
 	}
+
+	if *params.SkipStore {
+		defer cm.DeleteCertificate(certThumbprint)
+	}
+
 	result.Thumbprint = certThumbprint
-	result.ContainerName = container.ContainerName
 	result.ContainerPin = csr.Container.Pin
 	result.Exportable = csr.Container.Exportable
+
+	if !*params.SkipStore {
+		result.ContainerName = container.ContainerName
+	}
 	return result
 }
 
-func InstallRoot(cadesObj *cades.Cades) {
+func InstallRoot(cadesObj *cades.Cades, params *Params) {
 	rootCertificate := requestRootCertificate()
 	if rootCertificate == "" {
 		slog.Error("The root certificate could not be requested")
+		return
+	}
+
+	cerFilename := "cryptopro_ca.cer"
+	cerFilePath := filepath.Join(params.OutputFolder, cerFilename)
+	cerFile, err := os.Create(cerFilePath)
+	if err != nil {
+		slog.Error(fmt.Sprintf("Cant create file: %s, error: %s", cerFilePath, err.Error()))
+	}
+	cerFile.WriteString(rootCertificate)
+
+	if *params.SkipStore {
 		return
 	}
 
