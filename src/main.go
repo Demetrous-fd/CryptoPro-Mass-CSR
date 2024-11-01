@@ -35,8 +35,8 @@ func init() {
 }
 
 type Config struct {
-	Requests []CsrParams
-	Params   *Params
+	Requests []CsrParams `json:"requests"`
+	Params   Params      `json:"params,omitempty"`
 }
 
 type Params struct {
@@ -51,7 +51,7 @@ func main() {
 	flag.Parse()
 
 	if *versionFlag {
-		fmt.Println("Masscsr version 0.2.0")
+		fmt.Println("Masscsr version 0.2.1")
 		fmt.Println("Repository: https://github.com/Demetrous-fd/CryptoPro-Mass-CSR")
 		fmt.Println("Maintainer: Lazydeus (Demetrous-fd)")
 		return
@@ -134,14 +134,14 @@ func main() {
 	defer cadesLocal.Close()
 
 	if !*config.Params.SkipRoot {
-		InstallRoot(cadesLocal, config.Params)
+		InstallRoot(cadesLocal, &config.Params)
 	}
 
 	x509 := cades.CreateX509EnrollmentRoot(cadesLocal)
 
 	var containersInfo []ContainerInfo
 	for _, csr := range config.Requests {
-		info := ExecuteCsrInstall(x509, &csr, config.Params)
+		info := ExecuteCsrInstall(x509, &csr, &config.Params)
 
 		if (info != &ContainerInfo{}) {
 			containersInfo = append(containersInfo, *info)
