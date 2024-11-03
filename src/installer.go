@@ -12,7 +12,7 @@ import (
 
 type ContainerInfo struct {
 	Name          string `json:"name"`
-	Thumbprint    string `json:"thumbprint"`
+	Thumbprint    string `json:"thumbprint,omitempty"`
 	ContainerName string `json:"containerName,omitempty"`
 	ContainerPin  string `json:"containerPin,omitempty"`
 	Exportable    bool   `json:"exportable"`
@@ -59,7 +59,19 @@ func ExecuteCsrInstall(x509 *cades.X509EnrollmentRoot, csr *CsrParams, params *P
 		defer cm.DeleteContainer(container)
 	}
 
-	certificate := requestCertificate(csrData)
+	if *params.SkipCSRRequest {
+		result.Name = csr.Container.Name
+		result.ContainerPin = csr.Container.Pin
+		result.Exportable = csr.Container.Exportable
+
+		if !*params.SkipStore {
+			result.ContainerName = container.ContainerName
+		}
+		slog.Info(fmt.Sprintf("Container[%s] installed", csr.Container.Name))
+		return result
+	}
+
+	certificate := requestCertificate(csrData, params)
 	if certificate == "" {
 		slog.Error(fmt.Sprintf("Cant request certificate, container[%s]", csr.Container.Name))
 		cm.DeleteContainer(container)
@@ -97,18 +109,19 @@ func ExecuteCsrInstall(x509 *cades.X509EnrollmentRoot, csr *CsrParams, params *P
 	slog.Info(fmt.Sprintf("Container[%s] and certificate installed", csr.Container.Name))
 
 	result.Name = csr.Container.Name
+	result.ContainerPin = csr.Container.Pin
+	result.Exportable = csr.Container.Exportable
+
 	certThumbprint, err := getThumbprintFromBS64Certificate(certificate)
 	if err != nil {
 		slog.Error(err.Error())
+	} else {
+		result.Thumbprint = certThumbprint
 	}
 
 	if *params.SkipStore {
 		defer cm.DeleteCertificate(certThumbprint)
 	}
-
-	result.Thumbprint = certThumbprint
-	result.ContainerPin = csr.Container.Pin
-	result.Exportable = csr.Container.Exportable
 
 	if !*params.SkipStore {
 		result.ContainerName = container.ContainerName
@@ -117,7 +130,7 @@ func ExecuteCsrInstall(x509 *cades.X509EnrollmentRoot, csr *CsrParams, params *P
 }
 
 func InstallRoot(cadesObj *cades.Cades, params *Params) {
-	rootCertificate := requestRootCertificate()
+	rootCertificate := requestRootCertificate(params)
 	if rootCertificate == "" {
 		slog.Error("The root certificate could not be requested")
 		return

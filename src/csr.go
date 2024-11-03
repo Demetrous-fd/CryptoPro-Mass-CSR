@@ -24,6 +24,7 @@ const (
 	XCN_CERT_NAME_STR_ENABLE_PUNYCODE_FLAG = 2097152
 	XEKL_KEYSPEC_KEYX                      = 1
 	ALLOW_UNTRUSTED_ROOT                   = 4
+	XCN_CRYPT_STRING_BINARY                = 0x2
 )
 
 var (
@@ -33,16 +34,18 @@ var (
 type Container struct {
 	Name          string `json:"name,omitempty"`
 	Exportable    bool   `json:"exportable,omitempty"`
+	KeySpec       *int   `json:"keySpec,omitempty"`
 	KeyProtection int    `json:"keyProtection,omitempty"`
 	Pin           string `json:"pin,omitempty"`
 }
 
 type CsrParams struct {
-	ExtensionEKU     []string          `json:"extensionEKU,omitempty"`
-	EKUKeyUsageFlags *int              `json:"ekuKeyUsageFlags,omitempty"`
-	ProviderName     string            `json:"providerName,omitempty"`
-	Container        Container         `json:"container,omitempty"`
-	Dn               map[string]string `json:"dn"`
+	ExtensionEKU     []string            `json:"extensionEKU,omitempty"`
+	EKUKeyUsageFlags *int                `json:"ekuKeyUsageFlags,omitempty"`
+	ProviderName     string              `json:"providerName,omitempty"`
+	Container        Container           `json:"container,omitempty"`
+	SAN              map[string][]string `json:"san,omitempty"`
+	Dn               map[string]string   `json:"dn"`
 }
 
 func generateCsr(x509 *cades.X509EnrollmentRoot, params *CsrParams) (string, error) {
@@ -85,12 +88,17 @@ func generateCsr(x509 *cades.X509EnrollmentRoot, params *CsrParams) (string, err
 		return "", err
 	}
 
+	// Private Key
 	pk, err := x509.CX509PrivateKey()
 	if err != nil {
 		return "", err
 	}
 
-	_, err = pk.SetKeySpec(1)
+	if params.Container.KeySpec == nil {
+		_, err = pk.SetKeySpec(1)
+	} else {
+		_, err = pk.SetKeySpec(*params.Container.KeySpec)
+	}
 	if err != nil {
 		return "", err
 	}
@@ -159,6 +167,7 @@ func generateCsr(x509 *cades.X509EnrollmentRoot, params *CsrParams) (string, err
 		return "", err
 	}
 
+	// Extension Key Usage
 	eku, err := x509.CX509ExtensionKeyUsage()
 	if err != nil {
 		return "", err
@@ -188,6 +197,7 @@ func generateCsr(x509 *cades.X509EnrollmentRoot, params *CsrParams) (string, err
 		return "", err
 	}
 
+	// Subject
 	subjectInfo := dnToX500DistinguishedName(params.Dn)
 	oDn, err := x509.CX500DistinguishedName()
 	if err != nil {
@@ -204,6 +214,7 @@ func generateCsr(x509 *cades.X509EnrollmentRoot, params *CsrParams) (string, err
 		return "", err
 	}
 
+	// Enhanced Key Usage
 	oids, err := x509.CObjectIds()
 	if err != nil {
 		return "", err
@@ -252,6 +263,81 @@ func generateCsr(x509 *cades.X509EnrollmentRoot, params *CsrParams) (string, err
 		return "", err
 	}
 
+	// Subject alternative name
+	cadesVersion, err := cades.GetCadesVersion(x509.Cades)
+	if err != nil {
+		return "", err
+	}
+
+	pluginVersion, err := cades.GetPluginVersion(x509.Cades)
+	if err != nil {
+		return "", err
+	}
+
+	// КриптоПро CSP 5.0 R4 (сборка 5.0.13300 Uroboros) или новей
+	// КриптоПро ЭЦП Browser plug-in сборка 2.0.15260 или новей
+	if (cadesVersion.Major >= 5 && cadesVersion.Minor >= 0 && cadesVersion.Build >= 13300) &&
+		(pluginVersion.Build >= 2 && pluginVersion.Minor >= 0 && pluginVersion.Build >= 15260) {
+		altNames, err := x509.CAlternativeNames()
+		if err != nil {
+			return "", err
+		}
+
+		for oid, values := range params.SAN {
+			for _, value := range values {
+				objId, err := x509.CObjectId()
+				if err != nil {
+					return "", err
+				}
+
+				err = objId.InitializeFromValue(oid)
+				if err != nil {
+					return "", err
+				}
+
+				altName, err := x509.CAlternativeName()
+				if err != nil {
+					return "", err
+				}
+
+				err = altName.InitializeFromOtherName(objId, XCN_CRYPT_STRING_BINARY, value, true)
+				if err != nil {
+					return "", err
+				}
+
+				err = altNames.Add(altName)
+				if err != nil {
+					return "", err
+				}
+			}
+		}
+
+		extAltNames, err := x509.CX509ExtensionAlternativeNames()
+		if err != nil {
+			return "", err
+		}
+
+		err = extAltNames.InitializeEncode(altNames)
+		if err != nil {
+			return "", err
+		}
+
+		ext3, err := request.X509Extensions()
+		if err != nil {
+			return "", err
+		}
+
+		err = ext3.Add((*cades.CX509Extension)(extAltNames))
+		if err != nil {
+			return "", err
+		}
+	} else {
+		slog.Debug(fmt.Sprintf("CadesVersion: %+v", cadesVersion))
+		slog.Debug(fmt.Sprintf("PluginVersion: %+v", pluginVersion))
+		slog.Warn("Использование SAN(Subject alternative name) доступно с версии КриптоПро CSP 5.0 R4 (сборка 5.0.13300 Uroboros) и КриптоПро ЭЦП Browser plug-in сборка 2.0.15260")
+	}
+
+	// Getting hash algorithm
 	CspInformations, _ := x509.CCspInformations()
 	CspInformations.AddAvailableCsps()
 
@@ -283,6 +369,7 @@ func generateCsr(x509 *cades.X509EnrollmentRoot, params *CsrParams) (string, err
 		return "", err
 	}
 
+	// Enrollment
 	enroll, err := x509.CX509Enrollment()
 	if err != nil {
 		return "", err
@@ -310,7 +397,7 @@ func dnToX500DistinguishedName(dn map[string]string) string {
 	return strings.Join(parts, ";")
 }
 
-func requestCertificate(csr string) string {
+func requestCertificate(csr string, params *Params) string {
 	client := http.Client{}
 	formData := url.Values{}
 	formData.Add("Mode", "newreq")
@@ -320,14 +407,15 @@ func requestCertificate(csr string) string {
 	formData.Add("CertRequest", csr)
 
 	encodeData := formData.Encode()
+	uri := fmt.Sprintf("https://%s/certsrv/certfnsh.asp", *params.CA.Url)
 	request, _ := http.NewRequest(
-		"POST", "https://testgost2012.cryptopro.ru/certsrv/certfnsh.asp", strings.NewReader(encodeData),
+		"POST", uri, strings.NewReader(encodeData),
 	)
 	request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := client.Do(request)
 	if err != nil {
-		slog.Debug(fmt.Sprintf("Failed request to https://testgost2012.cryptopro.ru/certsrv/certfnsh.asp, error: %s", err.Error()))
+		slog.Debug(fmt.Sprintf("Failed request to %s, error: %s", uri, err.Error()))
 		return ""
 	}
 	defer resp.Body.Close()
@@ -345,7 +433,7 @@ func requestCertificate(csr string) string {
 		return ""
 	}
 
-	certUri := fmt.Sprintf("https://testgost2012.cryptopro.ru/certsrv/certnew.cer?%sEnc=b64", requestId)
+	certUri := fmt.Sprintf("https://%s/certsrv/certnew.cer?%sEnc=b64", *params.CA.Url, requestId)
 	resp, err = client.Get(certUri)
 	if err != nil {
 		slog.Debug(fmt.Sprintf("Failed request to %s, error: %s", certUri, err.Error()))

@@ -15,9 +15,9 @@ import (
 
 const CAPICOM_STORE_OPEN_READ_WRITE = 1
 
-func requestRootCertificate() string {
+func requestRootCertificate(params *Params) string {
 	client := http.Client{}
-	certUri := "https://testgost2012.cryptopro.ru/certsrv/certnew.cer?ReqID=CACert&Renewal=-1&Enc=b64"
+	certUri := fmt.Sprintf("https://%s/certsrv/certnew.cer?ReqID=CACert&Renewal=-1&Enc=b64", *params.CA.Url)
 
 	resp, err := client.Get(certUri)
 	if err != nil {
