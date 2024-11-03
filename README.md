@@ -92,7 +92,7 @@
 ```
 
 2. Запустите masscsr
-3. В папке `test_certs/{container.name}` сохраняется результат csr запроса: `{container.name}.(container;csr;cer;pfx)`
+3. В папке `test_certs/{container.name}` сохраняется результат csr запроса: `{container.name}.(csr;cer;pfx)` и `контейнер (abcd1234.000)`
 4. В файле `test_certs/info.json` находится информация о сгенерированных ЭЦП
 ```json
 [
