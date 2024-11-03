@@ -11,11 +11,12 @@ import (
 )
 
 type ContainerInfo struct {
-	Name          string `json:"name"`
-	Thumbprint    string `json:"thumbprint,omitempty"`
-	ContainerName string `json:"containerName,omitempty"`
-	ContainerPin  string `json:"containerPin,omitempty"`
-	Exportable    bool   `json:"exportable"`
+	Name            string `json:"name"`
+	Thumbprint      string `json:"thumbprint,omitempty"`
+	ContainerName   string `json:"containerName,omitempty"`
+	ContainerPin    string `json:"containerPin,omitempty"`
+	ContainerFolder string `json:"containerFolder,omitempty"`
+	Exportable      bool   `json:"exportable"`
 }
 
 func ExecuteCsrInstall(x509 *cades.X509EnrollmentRoot, csr *CsrParams, params *Params) *ContainerInfo {
@@ -54,6 +55,12 @@ func ExecuteCsrInstall(x509 *cades.X509EnrollmentRoot, csr *CsrParams, params *P
 	if err != nil {
 		slog.Error(fmt.Sprintf("Cant get container with name: %s, error: %s", csr.Container.Name, err.Error()))
 	}
+
+	containerFolderPath, err := SaveContainerToDisk(outputFolder, csr.Container.Name)
+	if err != nil {
+		slog.Error(fmt.Sprintf("Cant copy container: %s, error: %s", csr.Container.Name, err.Error()))
+	}
+	result.ContainerFolder = filepath.Base(containerFolderPath)
 
 	if *params.SkipStore {
 		defer cm.DeleteContainer(container)

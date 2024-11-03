@@ -6,7 +6,10 @@ import sys
 import os
 
 
-files = " ".join([str(file) for file in Path("src").glob("*.go")])
+files = [str(file) for file in Path("src").glob("*.go")]
+linux_files = " ".join([filename for filename in files if "windows" not in filename])
+windows_files = " ".join([filename for filename in files if "linux" not in filename])
+
 windows_folder = "bin/windows"
 linux_folder = "bin/linux"
 commands = {
@@ -16,12 +19,12 @@ commands = {
 
 build_commands = {
     "amd64": [
-        f"windows;go build -trimpath -ldflags \"-s -w\"  -o {windows_folder}/masscsr.exe {files}",
-        f"linux;go build -trimpath -ldflags \"-s -w\"  -o {linux_folder}/masscsr {files}",
+        f"windows;go build -trimpath -ldflags \"-s -w\"  -o {windows_folder}/masscsr.exe {windows_files}",
+        f"linux;go build -trimpath -ldflags \"-s -w\"  -o {linux_folder}/masscsr {linux_files}",
     ],
     "386": [
-        f"windows;go build -trimpath -ldflags \"-s -w\"  -o {windows_folder}/masscsr_32.exe {files}",
-        f"linux;go build -trimpath -ldflags \"-s -w\"  -o {linux_folder}/masscsr_32 {files}",
+        f"windows;go build -trimpath -ldflags \"-s -w\"  -o {windows_folder}/masscsr_32.exe {windows_files}",
+        f"linux;go build -trimpath -ldflags \"-s -w\"  -o {linux_folder}/masscsr_32 {linux_files}",
     ],
 }
 

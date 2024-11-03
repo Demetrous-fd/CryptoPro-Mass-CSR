@@ -90,7 +90,7 @@ func main() {
 	flag.Parse()
 
 	if *versionFlag {
-		fmt.Println("Masscsr version 0.3.0")
+		fmt.Println("Masscsr version 0.4.0")
 		fmt.Println("Repository: https://github.com/Demetrous-fd/CryptoPro-Mass-CSR")
 		fmt.Println("Maintainer: Lazydeus (Demetrous-fd)")
 		return
