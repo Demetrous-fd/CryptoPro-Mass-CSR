@@ -14,9 +14,10 @@ import (
 )
 
 var (
-	debugFlag          *bool
-	flatFlag           *bool
-	skipRootFlag       *bool
+	debugFlag    *bool
+	flatFlag     *bool
+	skipRootFlag *bool
+	// installChainFlag   *bool
 	skipStoreFlag      *bool
 	skipCSRRequestFlag *bool
 	versionFlag        *bool
@@ -30,6 +31,7 @@ func init() {
 	versionFlag = flag.Bool("version", false, "Отобразить версию программы")
 	skipRootFlag = flag.Bool("skip-root", false, "Пропустить этап загрузки и установки корневого сертификата УЦ")
 	skipStoreFlag = flag.Bool("skip-store", false, "Не сохранять корневой сертификата УЦ и ЭЦП в хранилище")
+	// installChainFlag = flag.Bool("install-chain", false, "Загрузка и установка цепочки сертификатов УЦ")
 	skipCSRRequestFlag = flag.Bool("skip-csr-request", false, "Пропустить отправку запроса на выпуск сертификата")
 	flatFlag = flag.Bool("flat", false, "Не сохранять контейнер/сертификат/csr запрос в отдельной папке")
 
@@ -48,12 +50,13 @@ type CAParams struct {
 }
 
 type Params struct {
-	Flat           *bool    `json:"flat"`
-	SkipRoot       *bool    `json:"skipRoot"`
-	SkipStore      *bool    `json:"skipStore"`
-	SkipCSRRequest *bool    `json:"skipCSRRequest"`
-	OutputFolder   string   `json:"outputFolder"`
-	CA             CAParams `json:"ca"`
+	Flat           *bool `json:"flat"`
+	SkipRoot       *bool `json:"skipRoot"`
+	SkipStore      *bool `json:"skipStore"`
+	SkipCSRRequest *bool `json:"skipCSRRequest"`
+	// InstallChain   *bool    `json:"installChain"`
+	OutputFolder string   `json:"outputFolder"`
+	CA           CAParams `json:"ca"`
 }
 
 func initConfig(data []byte) (*Config, error) {
@@ -69,6 +72,9 @@ func initConfig(data []byte) (*Config, error) {
 	if config.Params.SkipRoot == nil {
 		config.Params.SkipRoot = skipRootFlag
 	}
+	// if config.Params.InstallChain == nil {
+	// 	config.Params.InstallChain = installChainFlag
+	// }
 	if config.Params.SkipStore == nil {
 		config.Params.SkipStore = skipStoreFlag
 	}
@@ -90,7 +96,7 @@ func main() {
 	flag.Parse()
 
 	if *versionFlag {
-		fmt.Println("Masscsr version 0.4.0")
+		fmt.Println("Masscsr version 0.4.1")
 		fmt.Println("Repository: https://github.com/Demetrous-fd/CryptoPro-Mass-CSR")
 		fmt.Println("Maintainer: Lazydeus (Demetrous-fd)")
 		return
@@ -161,6 +167,10 @@ func main() {
 	if !*config.Params.SkipRoot {
 		InstallRoot(cadesLocal, &config.Params)
 	}
+
+	// if *config.Params.InstallChain {
+	// 	InstallChain(cadesLocal, &config.Params)
+	// }
 
 	x509 := cades.CreateX509EnrollmentRoot(cadesLocal)
 

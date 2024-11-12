@@ -49,6 +49,7 @@ func ExecuteCsrInstall(x509 *cades.X509EnrollmentRoot, csr *CsrParams, params *P
 	if err != nil {
 		slog.Error(fmt.Sprintf("Cant create file: %s, error: %s", csrFilePath, err.Error()))
 	}
+	defer csrFile.Close()
 	csrFile.WriteString(csrData)
 
 	container, err := cm.GetContainer(csr.Container.Name)
@@ -91,6 +92,7 @@ func ExecuteCsrInstall(x509 *cades.X509EnrollmentRoot, csr *CsrParams, params *P
 	if err != nil {
 		slog.Error(fmt.Sprintf("Cant create file: %s, error: %s", certFilePath, err.Error()))
 	}
+	defer certFile.Close()
 	certFile.WriteString(certificate)
 
 	err = installCertificate(x509, certificate)
@@ -149,6 +151,7 @@ func InstallRoot(cadesObj *cades.Cades, params *Params) {
 	if err != nil {
 		slog.Error(fmt.Sprintf("Cant create file: %s, error: %s", cerFilePath, err.Error()))
 	}
+	defer cerFile.Close()
 	cerFile.WriteString(rootCertificate)
 
 	if *params.SkipStore {
@@ -157,17 +160,49 @@ func InstallRoot(cadesObj *cades.Cades, params *Params) {
 
 	thumbprint, err := getThumbprintFromBS64Certificate(rootCertificate)
 
-	if err == nil {
-		cm := cades.CadesManager{}
-		exists, _ := cm.IsCertificateExists(thumbprint, "uRoot")
+	if err != nil {
+		return
+	}
 
-		if !exists {
-			err := installRootCertificate(cadesObj, rootCertificate)
-			if err != nil {
-				slog.Error(fmt.Sprintf("Cant install root certificate, error: %s", err.Error()))
-			} else {
-				slog.Info("Installed root certificate")
-			}
-		}
+	cm := cades.CadesManager{}
+	exists, _ := cm.IsCertificateExists(thumbprint, "uRoot")
+
+	if exists {
+		return
+	}
+
+	err = installRootCertificate(cadesObj, rootCertificate)
+	if err != nil {
+		slog.Error(fmt.Sprintf("Cant install root certificate, error: %s", err.Error()))
+	} else {
+		slog.Info("Installed root certificate")
 	}
 }
+
+// func InstallChain(cadesObj *cades.Cades, params *Params) {
+// 	chainData := requestChain(params)
+// 	if chainData == "" {
+// 		slog.Error("The certificate chain could not be requested")
+// 		return
+// 	}
+
+// 	chainFilename := "chain.p7b"
+// 	chainFilePath := filepath.Join(params.OutputFolder, chainFilename)
+// 	chainFile, err := os.Create(chainFilePath)
+// 	if err != nil {
+// 		slog.Error(fmt.Sprintf("Cant create file: %s, error: %s", chainFilePath, err.Error()))
+// 	}
+// 	chainFile.WriteString(chainData)
+// 	chainFile.Close()
+
+// 	if *params.SkipStore {
+// 		return
+// 	}
+
+// 	err = installChainCertificate(chainFilePath)
+// 	if err != nil {
+// 		slog.Error(fmt.Sprintf("Cant install certificate chain, error: %s", err.Error()))
+// 	} else {
+// 		slog.Info("The certificate chain is installed")
+// 	}
+// }

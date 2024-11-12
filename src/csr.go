@@ -264,77 +264,79 @@ func generateCsr(x509 *cades.X509EnrollmentRoot, params *CsrParams) (string, err
 	}
 
 	// Subject alternative name
-	cadesVersion, err := cades.GetCadesVersion(x509.Cades)
-	if err != nil {
-		return "", err
-	}
-
-	pluginVersion, err := cades.GetPluginVersion(x509.Cades)
-	if err != nil {
-		return "", err
-	}
-
-	// КриптоПро CSP 5.0 R4 (сборка 5.0.13300 Uroboros) или новей
-	// КриптоПро ЭЦП Browser plug-in сборка 2.0.15260 или новей
-	if (cadesVersion.Major >= 5 && cadesVersion.Minor >= 0 && cadesVersion.Build >= 13300) &&
-		(pluginVersion.Build >= 2 && pluginVersion.Minor >= 0 && pluginVersion.Build >= 15260) {
-		altNames, err := x509.CAlternativeNames()
+	if len(params.SAN) != 0 {
+		cadesVersion, err := cades.GetCadesVersion(x509.Cades)
 		if err != nil {
 			return "", err
 		}
 
-		for oid, values := range params.SAN {
-			for _, value := range values {
-				objId, err := x509.CObjectId()
-				if err != nil {
-					return "", err
-				}
+		pluginVersion, err := cades.GetPluginVersion(x509.Cades)
+		if err != nil {
+			return "", err
+		}
 
-				err = objId.InitializeFromValue(oid)
-				if err != nil {
-					return "", err
-				}
+		// КриптоПро CSP 5.0 R4 (сборка 5.0.13300 Uroboros) или новей
+		// КриптоПро ЭЦП Browser plug-in сборка 2.0.15260 или новей
+		if (cadesVersion.Major >= 5 && cadesVersion.Minor >= 0 && cadesVersion.Build >= 13300) &&
+			(pluginVersion.Build >= 2 && pluginVersion.Minor >= 0 && pluginVersion.Build >= 15260) {
+			altNames, err := x509.CAlternativeNames()
+			if err != nil {
+				return "", err
+			}
 
-				altName, err := x509.CAlternativeName()
-				if err != nil {
-					return "", err
-				}
+			for oid, values := range params.SAN {
+				for _, value := range values {
+					objId, err := x509.CObjectId()
+					if err != nil {
+						return "", err
+					}
 
-				err = altName.InitializeFromOtherName(objId, XCN_CRYPT_STRING_BINARY, value, true)
-				if err != nil {
-					return "", err
-				}
+					err = objId.InitializeFromValue(oid)
+					if err != nil {
+						return "", err
+					}
 
-				err = altNames.Add(altName)
-				if err != nil {
-					return "", err
+					altName, err := x509.CAlternativeName()
+					if err != nil {
+						return "", err
+					}
+
+					err = altName.InitializeFromOtherName(objId, XCN_CRYPT_STRING_BINARY, value, true)
+					if err != nil {
+						return "", err
+					}
+
+					err = altNames.Add(altName)
+					if err != nil {
+						return "", err
+					}
 				}
 			}
-		}
 
-		extAltNames, err := x509.CX509ExtensionAlternativeNames()
-		if err != nil {
-			return "", err
-		}
+			extAltNames, err := x509.CX509ExtensionAlternativeNames()
+			if err != nil {
+				return "", err
+			}
 
-		err = extAltNames.InitializeEncode(altNames)
-		if err != nil {
-			return "", err
-		}
+			err = extAltNames.InitializeEncode(altNames)
+			if err != nil {
+				return "", err
+			}
 
-		ext3, err := request.X509Extensions()
-		if err != nil {
-			return "", err
-		}
+			ext3, err := request.X509Extensions()
+			if err != nil {
+				return "", err
+			}
 
-		err = ext3.Add((*cades.CX509Extension)(extAltNames))
-		if err != nil {
-			return "", err
+			err = ext3.Add((*cades.CX509Extension)(extAltNames))
+			if err != nil {
+				return "", err
+			}
+		} else {
+			slog.Debug(fmt.Sprintf("CadesVersion: %+v", cadesVersion))
+			slog.Debug(fmt.Sprintf("PluginVersion: %+v", pluginVersion))
+			slog.Warn("Использование SAN(Subject alternative name) доступно с версии КриптоПро CSP 5.0 R4 (сборка 5.0.13300 Uroboros) и КриптоПро ЭЦП Browser plug-in сборка 2.0.15260")
 		}
-	} else {
-		slog.Debug(fmt.Sprintf("CadesVersion: %+v", cadesVersion))
-		slog.Debug(fmt.Sprintf("PluginVersion: %+v", pluginVersion))
-		slog.Warn("Использование SAN(Subject alternative name) доступно с версии КриптоПро CSP 5.0 R4 (сборка 5.0.13300 Uroboros) и КриптоПро ЭЦП Browser plug-in сборка 2.0.15260")
 	}
 
 	// Getting hash algorithm

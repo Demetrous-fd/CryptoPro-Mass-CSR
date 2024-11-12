@@ -15,13 +15,39 @@ import (
 
 const CAPICOM_STORE_OPEN_READ_WRITE = 1
 
+// func requestChain(params *Params) string {
+// 	client := http.Client{}
+// 	uri := fmt.Sprintf("https://%s/certsrv/certnew.p7b?ReqID=CACert&Renewal=-1&Enc=b64", *params.CA.Url)
+
+// 	resp, err := client.Get(uri)
+// 	if err != nil {
+// 		slog.Debug(fmt.Sprintf("Failed request to %s, error: %s", uri, err.Error()))
+// 		return ""
+// 	}
+// 	defer resp.Body.Close()
+
+// 	if resp.StatusCode != 200 {
+// 		slog.Debug(fmt.Sprintf("The chain could not be requested, status_code: %d", resp.StatusCode))
+// 		return ""
+// 	}
+
+// 	cert, err := io.ReadAll(resp.Body)
+// 	if err != nil {
+// 		slog.Debug(fmt.Sprintf("Cant read response, error: %s", err.Error()))
+// 		return ""
+// 	}
+
+// 	data := string(cert)
+// 	return data
+// }
+
 func requestRootCertificate(params *Params) string {
 	client := http.Client{}
-	certUri := fmt.Sprintf("https://%s/certsrv/certnew.cer?ReqID=CACert&Renewal=-1&Enc=b64", *params.CA.Url)
+	uri := fmt.Sprintf("https://%s/certsrv/certnew.cer?ReqID=CACert&Renewal=-1&Enc=b64", *params.CA.Url)
 
-	resp, err := client.Get(certUri)
+	resp, err := client.Get(uri)
 	if err != nil {
-		slog.Debug(fmt.Sprintf("Failed request to %s, error: %s", certUri, err.Error()))
+		slog.Debug(fmt.Sprintf("Failed request to %s, error: %s", uri, err.Error()))
 		return ""
 	}
 	defer resp.Body.Close()
@@ -60,8 +86,12 @@ func getThumbprintFromBS64Certificate(data string) (string, error) {
 	return thumbprint, nil
 }
 
-func installRootCertificate(cadesObj *cades.Cades, certificateData string) error {
+// func installChainCertificate(chainFile string) error {
+// 	cm := cades.CadesManager{}
+// 	return cm.InstallCertificate(chainFile, "", true)
+// }
 
+func installRootCertificate(cadesObj *cades.Cades, certificateData string) error {
 	certificate, err := cades.NewCertificate(cadesObj)
 	if err != nil {
 		return err
